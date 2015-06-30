@@ -106,11 +106,14 @@ var EvaManager = {
             version: version
         };
 
-        var params = {
-        };
-
+        var params = {};
         _.extend(config, args);
         _.extend(config.params, params);
+
+        //species can be the species code(String) or an object with text attribute
+        if ($.isPlainObject(config.params.species)) {
+            config.params["species"] = Utils.getSpeciesCode(config.species.text) + '_' + config.species.assembly.split('.')[0].toLowerCase();
+        }
 
         var query = '';
         if (typeof config.query !== 'undefined' && config.query != null) {

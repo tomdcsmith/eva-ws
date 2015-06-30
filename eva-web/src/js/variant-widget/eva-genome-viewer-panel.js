@@ -284,6 +284,7 @@ EvaGenomeViewerPanel.prototype = {
         }
 
         var genomeViewer = new GenomeViewer({
+            cellBaseHost:'http://bioinfodev.hpc.cam.ac.uk/cellbase',
             sidePanel: false,
             target: target,
             border: false,
@@ -406,6 +407,7 @@ EvaGenomeViewerPanel.prototype = {
         return genomeViewer;
     },
     _loadListStudies: function (filter, species) {
+        debugger
         var _this = this;
         var studies = [];
         var resource = '';

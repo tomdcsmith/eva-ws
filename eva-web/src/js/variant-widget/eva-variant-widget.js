@@ -894,7 +894,8 @@ EvaVariantWidget.prototype = {
         });
 
         var genomeViewer = new GenomeViewer({
-            //cellBaseHost:'https://wwwdev.ebi.ac.uk/cellbase/webservices/rest',
+            //cellBaseHost:'https://wwwdev.ebi.ac.uk/cellbase',
+            cellBaseHost:'http://bioinfodev.hpc.cam.ac.uk/cellbase',
             sidePanel: false,
             target: target,
             border: false,
