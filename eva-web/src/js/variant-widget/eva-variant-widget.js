@@ -960,18 +960,22 @@ EvaVariantWidget.prototype = {
         });
 
 
-        var sequence = new SequenceTrack({
-//        title: 'Sequence',
-            height: 30,
+        var sequence = new FeatureTrack({
+            title: 'Sequence',
+            height: 25,
             visibleRegionSize: 200,
 
             renderer: new SequenceRenderer(),
 
-            dataAdapter: new SequenceAdapter({
+            dataAdapter: new CellBaseAdapter({
                 category: "genomic",
                 subCategory: "region",
                 resource: "sequence",
-                species: genomeViewer.species
+                params: {},
+                species: genomeViewer.species,
+                cacheConfig: {
+                    chunkSize: 100
+                }
             })
         });
 
