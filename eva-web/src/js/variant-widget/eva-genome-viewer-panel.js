@@ -123,6 +123,11 @@ EvaGenomeViewerPanel.prototype = {
                 _this._loadListStudies(studyFilter, e.species);
                 console.log(e.species)
 
+                if (_this.genomeViewer) {
+                    var taxonomy = e.species.split('_')[0];
+                    _this.genomeViewer.setSpeciesByTaxonomy(taxonomy);
+                }
+
                 //EvaManager.get({
                 //    category: 'meta/studies',
                 //    resource: 'list',
@@ -168,7 +173,7 @@ EvaGenomeViewerPanel.prototype = {
             border: false,
             headerConfig: {
                 baseCls: 'eva-header-1',
-                titlePosition:1
+                titlePosition: 1
             },
             submitButtonText: 'Add',
             collapsible: true,
@@ -203,7 +208,7 @@ EvaGenomeViewerPanel.prototype = {
         params.exclude = 'sourceEntries';
         var eva = new FeatureTrack({
             title: title,
-            closable:true,
+            closable: true,
             featureType: 'eva',
             minHistogramRegionSize: 10000,
             maxLabelRegionSize: 3000,
@@ -353,16 +358,20 @@ EvaGenomeViewerPanel.prototype = {
                 }
             })
         });
-        var sequence = new SequenceTrack({
-            // title: 'Sequence',
-            height: 100,
+        var sequence = new FeatureTrack({
+            title: 'Sequence',
+            height: 25,
             visibleRegionSize: 200,
             renderer: new SequenceRenderer(),
-            dataAdapter: new SequenceAdapter({
+            dataAdapter: new CellBaseAdapter({
                 category: "genomic",
                 subCategory: "region",
                 resource: "sequence",
-                species: genomeViewer.species
+                params: {},
+                species: genomeViewer.species,
+                cacheConfig: {
+                    chunkSize: 100
+                }
             })
         });
         var gene = new GeneTrack({
@@ -410,6 +419,7 @@ EvaGenomeViewerPanel.prototype = {
         return genomeViewer;
     },
     _loadListStudies: function (filter, species) {
+        debugger
         var _this = this;
         var studies = [];
         var resource = '';

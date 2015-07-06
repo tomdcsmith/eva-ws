@@ -54,7 +54,7 @@ function EvaVariantWidget(args) {
         stats: true,
         rawData: true,
         populationStats: true,
-        annot:true
+        annot: true
     };
     this.tools = [];
     this.dataParser;
@@ -292,19 +292,19 @@ EvaVariantWidget.prototype = {
     _createVariantBrowserGrid: function (target) {
         var _this = this;
 
-        var columns ={
-            items:[
+        var columns = {
+            items: [
                 {
                     text: "Chr",
                     dataIndex: 'chromosome',
 //                    flex: 0.5,/
-                    width:50
+                    width: 50
                 },
                 {
                     text: 'Position',
                     dataIndex: 'start',
 //                    flex: 0.5,
-                    width:100
+                    width: 100
                 },
                 {
                     header: '<img class="header-icon" style="margin-bottom:0px;" src="img/icon-info.png"/>Variant ID',
@@ -322,9 +322,9 @@ EvaVariantWidget.prototype = {
 //                             return snpID;
 //                         }
 //                    },
-                    width:130,
-                    iconCls : 'icon-info',
-                    tooltip:'dbSNP ID(Human), TransPlant ID(Plant) and Submitted ID(others)',
+                    width: 130,
+                    iconCls: 'icon-info',
+                    tooltip: 'dbSNP ID(Human), TransPlant ID(Plant) and Submitted ID(others)',
                 },
                 //{
                 //text: 'End',
@@ -338,7 +338,7 @@ EvaVariantWidget.prototype = {
 ////                        console.log(record)
 //                    },
 //                    flex: 0.5
-                    width:60
+                    width: 60
                 },
                 {
                     text: 'Class',
@@ -346,7 +346,7 @@ EvaVariantWidget.prototype = {
 //                    flex: 0.3,
                     xtype: "templatecolumn",
                     tpl: '<tpl if="type"><a href="http://www.ncbi.nlm.nih.gov/books/NBK44447/#Content.what_classes_of_genetic_variatio" target="_blank">{type}</a><tpl else>-</tpl>',
-                    width:60
+                    width: 60
                 },
 //            {
 //                text: '1000G MAF',
@@ -372,43 +372,43 @@ EvaVariantWidget.prototype = {
                 {
                     text: 'Most Severe <br /> Consequence Type',
                     dataIndex: 'consequenceTypes',
-                    renderer: function(value, meta, rec, rowIndex, colIndex, store){
+                    renderer: function (value, meta, rec, rowIndex, colIndex, store) {
                         var tempArray = [];
                         var consequenceTypes = rec.data.consequenceTypes;
-                        if(!_.isUndefined(value)){
+                        if (!_.isUndefined(value)) {
                             var tempArray = [];
-                            _.each(_.keys(consequenceTypes), function(key){
+                            _.each(_.keys(consequenceTypes), function (key) {
                                 var so_terms = this[key].soTerms;
-                                _.each(_.keys(so_terms), function(key){
+                                _.each(_.keys(so_terms), function (key) {
                                     tempArray.push(this[key].soName)
-                                },so_terms);
-                            },consequenceTypes);
+                                }, so_terms);
+                            }, consequenceTypes);
 
 
                             var groupedArr = _.groupBy(tempArray);
                             var so_array = [];
-                            _.each(_.keys(groupedArr), function(key){
-                                var index =  _.indexOf(consequenceTypesHierarchy, key);
+                            _.each(_.keys(groupedArr), function (key) {
+                                var index = _.indexOf(consequenceTypesHierarchy, key);
 //                                        so_array.splice(index, 0, key+' ('+this[key].length+')');
 //                                        so_array.push(key+' ('+this[key].length+')')
 //                                so_array[index] = key+' ('+this[key].length+')';
                                 so_array[index] = key;
-                            },groupedArr);
-                            so_array =  _.compact(so_array);
-                            meta.tdAttr = 'data-qtip="'+so_array.join('\n')+'"';
+                            }, groupedArr);
+                            so_array = _.compact(so_array);
+                            meta.tdAttr = 'data-qtip="' + so_array.join('\n') + '"';
                             return value ? Ext.String.format(
 //                                '<tpl>'+so_array.join()+'</tpl>',
-                                '<tpl>'+_.first(so_array)+'</tpl>',
+                                '<tpl>' + _.first(so_array) + '</tpl>',
                                 value
                             ) : '';
-                        }else{
+                        } else {
                             return '';
                         }
 
 //                        return tempArray.join();
                     },
 //                    flex: 1
-                    width:230,
+                    width: 230,
                 },
 
 //                {
@@ -451,40 +451,40 @@ EvaVariantWidget.prototype = {
                         {
                             text: "Polyphen2",
                             dataIndex: "consequenceTypes",
-                            width:130,
-                            renderer: function(value, meta, rec, rowIndex, colIndex, store){
+                            width: 130,
+                            renderer: function (value, meta, rec, rowIndex, colIndex, store) {
                                 var tempArray = [];
                                 var consequenceTypes = rec.data.consequenceTypes;
-                                if(!_.isUndefined(value)){
+                                if (!_.isUndefined(value)) {
                                     var tempArray = [];
-                                    _.each(_.keys(consequenceTypes), function(key){
+                                    _.each(_.keys(consequenceTypes), function (key) {
                                         var so_terms = this[key].soTerms;
-                                        _.each(_.keys(so_terms), function(key){
+                                        _.each(_.keys(so_terms), function (key) {
                                             tempArray.push(this[key].soName)
-                                        },so_terms);
-                                    },consequenceTypes);
+                                        }, so_terms);
+                                    }, consequenceTypes);
 
 
                                     var groupedArr = _.groupBy(tempArray);
                                     var so_array = [];
-                                    _.each(_.keys(groupedArr), function(key){
-                                        var index =  _.indexOf(consequenceTypesHierarchy, key);
+                                    _.each(_.keys(groupedArr), function (key) {
+                                        var index = _.indexOf(consequenceTypesHierarchy, key);
 //                                        so_array.splice(index, 0, key+' ('+this[key].length+')');
 //                                        so_array.push(key+' ('+this[key].length+')')
 //                                so_array[index] = key+' ('+this[key].length+')';
                                         so_array[index] = key;
-                                    },groupedArr);
-                                    so_array =  _.compact(so_array);
-                                    meta.tdAttr = 'data-qtip="'+so_array.join('\n')+'"';
+                                    }, groupedArr);
+                                    so_array = _.compact(so_array);
+                                    meta.tdAttr = 'data-qtip="' + so_array.join('\n') + '"';
                                     var score = '-';
                                     for (i = 0; i < consequenceTypes.length; i++) {
                                         for (j = 0; j < consequenceTypes[i].soTerms.length; j++) {
-                                            if(consequenceTypes[i].soTerms[j].soName == _.first(so_array)){
-                                                _.each(_.keys(consequenceTypes[i].proteinSubstitutionScores), function(key){
-                                                    if(this[key].source == 'Polyphen'){
+                                            if (consequenceTypes[i].soTerms[j].soName == _.first(so_array)) {
+                                                _.each(_.keys(consequenceTypes[i].proteinSubstitutionScores), function (key) {
+                                                    if (this[key].source == 'Polyphen') {
                                                         score = this[key].score;
                                                     }
-                                                },consequenceTypes[i].proteinSubstitutionScores);
+                                                }, consequenceTypes[i].proteinSubstitutionScores);
                                             }
 
                                         }
@@ -493,7 +493,7 @@ EvaVariantWidget.prototype = {
                                     return score;
 
 
-                                }else{
+                                } else {
                                     return '';
                                 }
                             },
@@ -502,40 +502,40 @@ EvaVariantWidget.prototype = {
                         {
                             text: "Sift",
                             dataIndex: "consequenceTypes",
-                            width:130,
-                            renderer: function(value, meta, rec, rowIndex, colIndex, store){
+                            width: 130,
+                            renderer: function (value, meta, rec, rowIndex, colIndex, store) {
                                 var tempArray = [];
                                 var consequenceTypes = rec.data.consequenceTypes;
-                                if(!_.isUndefined(value)){
+                                if (!_.isUndefined(value)) {
                                     var tempArray = [];
-                                    _.each(_.keys(consequenceTypes), function(key){
+                                    _.each(_.keys(consequenceTypes), function (key) {
                                         var so_terms = this[key].soTerms;
-                                        _.each(_.keys(so_terms), function(key){
+                                        _.each(_.keys(so_terms), function (key) {
                                             tempArray.push(this[key].soName)
-                                        },so_terms);
-                                    },consequenceTypes);
+                                        }, so_terms);
+                                    }, consequenceTypes);
 
 
                                     var groupedArr = _.groupBy(tempArray);
                                     var so_array = [];
-                                    _.each(_.keys(groupedArr), function(key){
-                                        var index =  _.indexOf(consequenceTypesHierarchy, key);
+                                    _.each(_.keys(groupedArr), function (key) {
+                                        var index = _.indexOf(consequenceTypesHierarchy, key);
 //                                        so_array.splice(index, 0, key+' ('+this[key].length+')');
 //                                        so_array.push(key+' ('+this[key].length+')')
 //                                so_array[index] = key+' ('+this[key].length+')';
                                         so_array[index] = key;
-                                    },groupedArr);
-                                    so_array =  _.compact(so_array);
-                                    meta.tdAttr = 'data-qtip="'+so_array.join('\n')+'"';
+                                    }, groupedArr);
+                                    so_array = _.compact(so_array);
+                                    meta.tdAttr = 'data-qtip="' + so_array.join('\n') + '"';
                                     var score = '-';
                                     for (i = 0; i < consequenceTypes.length; i++) {
                                         for (j = 0; j < consequenceTypes[i].soTerms.length; j++) {
-                                            if(consequenceTypes[i].soTerms[j].soName == _.first(so_array)){
-                                                _.each(_.keys(consequenceTypes[i].proteinSubstitutionScores), function(key){
-                                                    if(this[key].source == 'Sift'){
+                                            if (consequenceTypes[i].soTerms[j].soName == _.first(so_array)) {
+                                                _.each(_.keys(consequenceTypes[i].proteinSubstitutionScores), function (key) {
+                                                    if (this[key].source == 'Sift') {
                                                         score = this[key].score;
                                                     }
-                                                },consequenceTypes[i].proteinSubstitutionScores);
+                                                }, consequenceTypes[i].proteinSubstitutionScores);
                                             }
 
                                         }
@@ -544,7 +544,7 @@ EvaVariantWidget.prototype = {
                                     return score;
 
 
-                                }else{
+                                } else {
                                     return '';
                                 }
                             },
@@ -554,12 +554,12 @@ EvaVariantWidget.prototype = {
                 {
                     text: 'View',
                     dataIndex: 'id',
-                    id:'variant-grid-view-column',
+                    id: 'variant-grid-view-column',
                     xtype: 'templatecolumn',
                     tpl: '<tpl if="id"><a href="?variant={chromosome}:{start}:{reference}:{alternate}" target="_blank"><img class="eva-grid-img-active" src="img/eva_logo.png"/></a>&nbsp;' +
-                        '<a href="http://www.ensembl.org/Homo_sapiens/Variation/Explore?vdb=variation;v={id}" target="_blank"><img alt="" src="http://static.ensembl.org/i/search/ensembl.gif"></a>' +
-                        '&nbsp;<a href="http://www.ncbi.nlm.nih.gov/SNP/snp_ref.cgi?searchType=adhoc_search&type=rs&rs={id}" target="_blank"><span>dbSNP</span></a>' +
-                        '<tpl else><a href="?variant={chromosome}:{start}:{reference}:{alternate}" target="_blank"><img class="eva-grid-img-active" src="img/eva_logo.png"/></a>&nbsp;<img alt="" class="eva-grid-img-inactive " src="http://static.ensembl.org/i/search/ensembl.gif">&nbsp;<span  style="opacity:0.2" class="eva-grid-img-inactive ">dbSNP</span></tpl>',
+                    '<a href="http://www.ensembl.org/Homo_sapiens/Variation/Explore?vdb=variation;v={id}" target="_blank"><img alt="" src="http://static.ensembl.org/i/search/ensembl.gif"></a>' +
+                    '&nbsp;<a href="http://www.ncbi.nlm.nih.gov/SNP/snp_ref.cgi?searchType=adhoc_search&type=rs&rs={id}" target="_blank"><span>dbSNP</span></a>' +
+                    '<tpl else><a href="?variant={chromosome}:{start}:{reference}:{alternate}" target="_blank"><img class="eva-grid-img-active" src="img/eva_logo.png"/></a>&nbsp;<img alt="" class="eva-grid-img-inactive " src="http://static.ensembl.org/i/search/ensembl.gif">&nbsp;<span  style="opacity:0.2" class="eva-grid-img-inactive ">dbSNP</span></tpl>',
                     flex: 0.3,
                 }
 
@@ -567,11 +567,11 @@ EvaVariantWidget.prototype = {
             ],
             defaults: {
 //                flex: 1,
-                align:'left' ,
-                sortable : false,
-                menuDisabled:true
+                align: 'left',
+                sortable: false,
+                menuDisabled: true
             }
-        } ;
+        };
 
         var attributes = [
             {name: 'id', type: 'string'},
@@ -583,7 +583,7 @@ EvaVariantWidget.prototype = {
             {name: "alt", type: "string"},
             {name: 'hgvs_name', type: 'string'},
 //            {name: 'id', mapping: 'annotation.xrefs[0].id', type: 'string' },
-            {name: 'consequenceTypes', mapping: 'annotation.consequenceTypes', type:'auto' },
+            {name: 'consequenceTypes', mapping: 'annotation.consequenceTypes', type: 'auto'},
 //            {name: 'conservedRegionScores', mapping: 'annotation.conservedRegionScores', type:'auto'},
 //            {name: 'phylop',  mapping: 'annotation.conservedRegionScores', type:'auto'},
 //            {name: 'phastCons', mapping: 'annotation.conservedRegionScores', type:'auto'}
@@ -882,7 +882,7 @@ EvaVariantWidget.prototype = {
         var _this = this;
         var annotPanel = new ClinvarAnnotationPanel({
             target: target,
-            height:800,
+            height: 800,
             headerConfig: this.defaultToolConfig.headerConfig,
             handlers: {
                 "load:finish": function (e) {
@@ -898,9 +898,9 @@ EvaVariantWidget.prototype = {
 
         this.on("variant:change", function (e) {
 //            if (target === _this.selectedToolDiv) {
-            if(_.isUndefined(e.variant)){
+            if (_.isUndefined(e.variant)) {
                 annotPanel.clear(true);
-            }else{
+            } else {
                 if (target.id === _this.selectedToolDiv.id) {
                     _.extend(e.variant, {annot: e.variant.annotation});
                     console.log(e.variant)
@@ -1142,18 +1142,22 @@ EvaVariantWidget.prototype = {
         });
 
 
-        var sequence = new SequenceTrack({
-//        title: 'Sequence',
-            height: 30,
+        var sequence = new FeatureTrack({
+            title: 'Sequence',
+            height: 25,
             visibleRegionSize: 200,
 
             renderer: new SequenceRenderer(),
 
-            dataAdapter: new SequenceAdapter({
+            dataAdapter: new CellBaseAdapter({
                 category: "genomic",
                 subCategory: "region",
                 resource: "sequence",
-                species: genomeViewer.species
+                params: {},
+                species: genomeViewer.species,
+                cacheConfig: {
+                    chunkSize: 100
+                }
             })
         });
 
