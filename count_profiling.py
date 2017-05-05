@@ -3,12 +3,14 @@ import random
 import sys
 import traceback
 import datetime
+import math
 
 import progressbar
 from bson.codec_options import CodecOptions
 from pymongo import MongoClient, ReadPreference
 import numpy as np
 from scipy import stats
+
 
 CHROM_INFO = {
     "1": {"minStart": 10020, "maxStart": 249240605, "numEntries": 12422239},
@@ -42,66 +44,84 @@ def main():
     parser = ArgParser(sys.argv)
     collection = get_collection(parser.uri, parser.database, parser.username, parser.password,
                                 parser.collection)
-    benchmark(collection)
+    benchmark(collection, parser.margin, parser.query_length)
 
 
-def benchmark(collection):
-    n_iters = 6
-    numRuns = 3
+def benchmark(collection, margin, query_length):
+    fc_ex_times = []
+    ac_ex_times = []
 
-    chrom = "13"
-    minChromPos = 6000000
-    maxChromPos = 40000000
-    margin = 5000
-    query_length = 2000000
+    fc_counts = []
+    ac_counts = []
+
+    chromosomes = [str(chromosome) for chromosome in range(1, 23)] + ["X", "Y"]
+
+    benchmark_functions = ["fc", "ac"]
+    random.shuffle(benchmark_functions)
+    mult_factor = math.floor(len(chromosomes) / len(benchmark_functions))
+    benchmark_functions *= mult_factor
 
     bar = progressbar.ProgressBar()
 
-    benchmark_functions = [benchmark_find_count, benchmark_aggregate_count]
+    for chromosome, benchmark_function in bar(zip(chromosomes, benchmark_functions)):
+        min_pos, max_pos = get_min_max_pos(chromosome, query_length)
+        start = random.randint(min_pos, max_pos)
+        end = start + query_length
 
-    find_count_ex_times = []
-    aggregate_count_ex_times = []
+        if benchmark_function == "fc":
+            query = {"chr": chromosome,
+                     "start": {"$gt": start - margin, "$lte": end},
+                     "end": {"$gte": start, "$lte": end + margin}}
 
-    find_count_counts = []
-    aggregate_count_counts = []
+            ex_time, count = run_query("find_count", collection, query)
+            fc_ex_times.append(ex_time)
+            fc_counts.append(count)
 
-    random.shuffle(benchmark_functions)
+        elif benchmark_function == "ac":
+            query = [
+                {"$match":
+                     {"chr": chromosome,
+                      "start": {"$gt": start - margin, "$lte": end},
+                      "end": {"$gte": start, "$lte": end + margin}}
+                 },
+                {"$group": {
+                    "_id": None,
+                    "count": {"$sum": 1}
+                }}
+            ]
 
-    print(
-        "n_iters: {}, numRuns: {}, chrom: {}, minChromPos: {}, maxChromPos: {}, margin: {}, query_length: {}"
-        .format(n_iters, numRuns, chrom, minChromPos, maxChromPos, margin, query_length))
+            ex_time, count = run_query("agg_count", collection, query)
+            ac_ex_times.append(ex_time)
+            ac_counts.append(count)
 
-    for _ in bar(list(range(n_iters))):
+        else:
+            print(benchmark_function)
+            sys.exit(1)
 
-        benchmark_functions.insert(1, benchmark_functions.pop(0))
-
-        for benchmark_function in benchmark_functions:
-            new_ex_times, new_counts = benchmark_function(numRuns, minChromPos, maxChromPos,
-                                                          query_length, chrom, margin, collection)
-            if benchmark_function == benchmark_find_count:
-                find_count_ex_times.extend(new_ex_times)
-                find_count_counts.extend(new_counts)
-            elif benchmark_function == benchmark_aggregate_count:
-                aggregate_count_ex_times.extend(new_ex_times)
-                aggregate_count_counts.extend(new_counts)
-            else:
-                print(benchmark_function)
-                sys.exit(1)
-
-        output_stats(find_count_ex_times, find_count_counts, aggregate_count_ex_times,
-                     aggregate_count_counts)
+    output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
 
 
-def output_stats(find_count_ex_times, find_count_counts, aggregate_count_ex_times,
-                 aggregate_count_counts):
+def get_min_max_pos(chromosome, query_length):
+    min_pos = CHROM_INFO[chromosome]["minStart"]
+    max_pos = CHROM_INFO[chromosome]["maxStart"] - query_length
+    return min_pos, max_pos
+
+
+def output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts):
+
+    rec_div = 10000
+
+    fc_time_per_n_rec = np.divide(fc_ex_times, np.divide(fc_counts, rec_div))
+    ac_time_per_n_rec = np.divide(ac_ex_times, np.divide(ac_counts, rec_div))
+
     print("\n\n#####################################################\n")
     print("STATS\n")
 
     print("EX TIMES STATS")
-    stats_helper(find_count_ex_times, aggregate_count_ex_times)
+    stats_helper(fc_ex_times, ac_ex_times)
 
-    print("\nEX TIMES / RECORD COUNT STATS")
-    stats_helper(find_count_counts, aggregate_count_counts)
+    print("\nTIME PER {} RECORDS".format(rec_div))
+    stats_helper(fc_time_per_n_rec, ac_time_per_n_rec)
 
     print("\n#####################################################\n\n")
 
@@ -137,60 +157,9 @@ def stats_helper(find_count_stat_list, aggregate_count_stat_list):
     print("Quartiles:\n{}\n{}\n".format(find_count_quartiles, aggregate_count_quartiles))
     print("Standard deviation: {}, {}".format(find_count_std, aggregate_count_std))
 
-    print(
-        "T-test (t-statistic, two-tailed p-value): {}".format(stats.ttest_ind(find_count_stat_list,
-                                                                              aggregate_count_stat_list,
-                                                                              equal_var=False)))
-
-
-def benchmark_find_count(numRuns, minChromPos, maxChromPos, query_length, chrom, margin,
-                         collection):
-    ex_times = []
-    counts = []
-    for _ in range(numRuns):
-        # Use random positions for each run to avoid caching effects
-        start = random.randint(minChromPos, maxChromPos)
-        end = start + query_length
-
-        query = {"chr": chrom,
-                 "start": {"$gt": start - margin, "$lte": end},
-                 "end": {"$gte": start, "$lte": end + margin}}
-
-        ex_time, count = run_query("find_count", collection, query)
-
-        counts.append(count)
-        ex_times.append(ex_time)
-
-    return ex_times, counts
-
-
-def benchmark_aggregate_count(numRuns, minChromPos, maxChromPos, query_length, chrom, margin,
-                              collection):
-    ex_times = []
-    counts = []
-    for _ in range(numRuns):
-        # Use random positions for each run to avoid caching effects
-        start = random.randint(minChromPos, maxChromPos)
-        end = start + query_length
-
-        pipeline = [
-            {"$match":
-                 {"chr": chrom,
-                  "start": {"$gt": start - margin, "$lte": end},
-                  "end": {"$gte": start, "$lte": end + margin}}
-             },
-            {"$group": {
-                "_id": None,
-                "count": {"$sum": 1}
-            }}
-        ]
-
-        ex_time, count = run_query("agg_count", collection, pipeline)
-
-        counts.append(count)
-        ex_times.append(ex_time)
-
-    return ex_times, counts
+    # print(
+    #     "Mann-Whitney rank test (test statistic, pvalue): {}".format(stats.mannwhitneyu(find_count_stat_list,
+    #                                                                                     aggregate_count_stat_list)))
 
 
 def run_query(method, collection, query):
@@ -206,7 +175,6 @@ def run_query(method, collection, query):
     ex_time = (endTime - startTime).total_seconds()
 
     return ex_time, count
-
 
 
 def get_collection(uri=None, db=None, user=None, password=None, collection=None):
@@ -234,6 +202,9 @@ class ArgParser:
         parser.add_argument('-l', dest='collection', action='store', help='collection')
         parser.add_argument('-u', dest='username', action='store', help='username')
         parser.add_argument('-p', dest='password', action='store', help='password')
+        parser.add_argument('-m', dest='margin', action='store', help='margin')
+        parser.add_argument('-q', dest='query_length', action='store', help='query_length')
+        parser.add_argument('-P', dest='passes', action='store', help='passes')
 
         args = parser.parse_args(args=argv[1:])
 
@@ -242,6 +213,9 @@ class ArgParser:
         self.collection = args.collection
         self.username = args.username
         self.password = args.password
+        self.margin = int(args.margin)
+        self.query_length = int(args.query_length)
+        # self.passes = int(args.passes)
 
 
 if __name__ == '__main__':
