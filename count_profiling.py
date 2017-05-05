@@ -44,10 +44,10 @@ def main():
     parser = ArgParser(sys.argv)
     collection = get_collection(parser.uri, parser.database, parser.username, parser.password,
                                 parser.collection)
-    benchmark(collection, parser.margin, parser.query_length)
+    benchmark(collection, parser.margin, parser.query_length, parser.passes)
 
 
-def benchmark(collection, margin, query_length):
+def benchmark(collection, margin, query_length, passes):
     fc_ex_times = []
     ac_ex_times = []
 
@@ -55,48 +55,51 @@ def benchmark(collection, margin, query_length):
     ac_counts = []
 
     chromosomes = [str(chromosome) for chromosome in range(1, 23)] + ["X", "Y"]
+    # chromosomes = ["X", "Y"]
 
     benchmark_functions = ["fc", "ac"]
     random.shuffle(benchmark_functions)
-    mult_factor = math.floor(len(chromosomes) / len(benchmark_functions))
-    benchmark_functions *= mult_factor
 
-    bar = progressbar.ProgressBar()
+    for _ in range(passes):
+        benchmark_functions.insert(1, benchmark_functions.pop(0))
+        mult_factor = math.floor(len(chromosomes) / len(benchmark_functions))
+        benchmark_functions_to_iter = benchmark_functions * mult_factor
 
-    for chromosome, benchmark_function in bar(zip(chromosomes, benchmark_functions)):
-        min_pos, max_pos = get_min_max_pos(chromosome, query_length)
-        start = random.randint(min_pos, max_pos)
-        end = start + query_length
+        bar = progressbar.ProgressBar()
+        for chromosome, benchmark_function in bar(zip(chromosomes, benchmark_functions_to_iter)):
+            min_pos, max_pos = get_min_max_pos(chromosome, query_length)
+            start = random.randint(min_pos, max_pos)
+            end = start + query_length
 
-        if benchmark_function == "fc":
-            query = {"chr": chromosome,
-                     "start": {"$gt": start - margin, "$lte": end},
-                     "end": {"$gte": start, "$lte": end + margin}}
+            if benchmark_function == "fc":
+                query = {"chr": chromosome,
+                         "start": {"$gt": start - margin, "$lte": end},
+                         "end": {"$gte": start, "$lte": end + margin}}
 
-            ex_time, count = run_query("find_count", collection, query)
-            fc_ex_times.append(ex_time)
-            fc_counts.append(count)
+                ex_time, count = run_query("find_count", collection, query)
+                fc_ex_times.append(ex_time)
+                fc_counts.append(count)
 
-        elif benchmark_function == "ac":
-            query = [
-                {"$match":
-                     {"chr": chromosome,
-                      "start": {"$gt": start - margin, "$lte": end},
-                      "end": {"$gte": start, "$lte": end + margin}}
-                 },
-                {"$group": {
-                    "_id": None,
-                    "count": {"$sum": 1}
-                }}
-            ]
+            elif benchmark_function == "ac":
+                query = [
+                    {"$match":
+                         {"chr": chromosome,
+                          "start": {"$gt": start - margin, "$lte": end},
+                          "end": {"$gte": start, "$lte": end + margin}}
+                     },
+                    {"$group": {
+                        "_id": None,
+                        "count": {"$sum": 1}
+                    }}
+                ]
 
-            ex_time, count = run_query("agg_count", collection, query)
-            ac_ex_times.append(ex_time)
-            ac_counts.append(count)
+                ex_time, count = run_query("agg_count", collection, query)
+                ac_ex_times.append(ex_time)
+                ac_counts.append(count)
 
-        else:
-            print(benchmark_function)
-            sys.exit(1)
+            else:
+                print(benchmark_function)
+                sys.exit(1)
 
     output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
 
@@ -126,52 +129,54 @@ def output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts):
     print("\n#####################################################\n\n")
 
 
-def stats_helper(find_count_stat_list, aggregate_count_stat_list):
-    find_count_mean = np.mean(find_count_stat_list)
-    aggregate_count_mean = np.mean(aggregate_count_stat_list)
+def stats_helper(fc_stat_list, ac_stat_list):
+    fc_mean = np.mean(fc_stat_list)
+    ac_mean = np.mean(ac_stat_list)
 
-    find_count_quartiles = [
-        min(find_count_stat_list),
-        np.percentile(find_count_stat_list, 25),
-        np.percentile(find_count_stat_list, 50),
-        np.percentile(find_count_stat_list, 75),
-        max(find_count_stat_list)
+    fc_quartiles = [
+        min(fc_stat_list),
+        np.percentile(fc_stat_list, 25),
+        np.percentile(fc_stat_list, 50),
+        np.percentile(fc_stat_list, 75),
+        max(fc_stat_list)
     ]
 
-    aggregate_count_quartiles = [
-        min(aggregate_count_stat_list),
-        np.percentile(aggregate_count_stat_list, 25),
-        np.percentile(aggregate_count_stat_list, 50),
-        np.percentile(aggregate_count_stat_list, 75),
-        max(aggregate_count_stat_list)
+    ac_quartiles = [
+        min(ac_stat_list),
+        np.percentile(ac_stat_list, 25),
+        np.percentile(ac_stat_list, 50),
+        np.percentile(ac_stat_list, 75),
+        max(ac_stat_list)
     ]
 
-    find_count_std = np.std(find_count_stat_list)
-    aggregate_count_std = np.std(aggregate_count_stat_list)
+    fc_std = np.std(fc_stat_list)
+    ac_std = np.std(ac_stat_list)
 
-    print("find().count():\n{}".format(find_count_stat_list))
-    print("aggregate count:\n{}".format(aggregate_count_stat_list))
+    print("find().count():\n{}".format(fc_stat_list))
+    print("aggregate count:\n{}".format(ac_stat_list))
 
     print("\nStats [find_count, aggregate_count]\n")
-    print("Means: {}, {}".format(find_count_mean, aggregate_count_mean))
-    print("Quartiles:\n{}\n{}\n".format(find_count_quartiles, aggregate_count_quartiles))
-    print("Standard deviation: {}, {}".format(find_count_std, aggregate_count_std))
+    print("Means: {}, {}".format(fc_mean, ac_mean))
+    print("Quartiles:\n{}\n{}\n".format(fc_quartiles, ac_quartiles))
+    print("Standard deviation: {}, {}".format(fc_std, ac_std))
 
-    # print(
-    #     "Mann-Whitney rank test (test statistic, pvalue): {}".format(stats.mannwhitneyu(find_count_stat_list,
-    #                                                                                     aggregate_count_stat_list)))
+    if len(fc_stat_list) > 20 and len(ac_stat_list) > 20:
+        print("Mann-Whitney rank test (test statistic, pvalue): {}".format(
+            stats.mannwhitneyu(fc_stat_list, ac_stat_list)))
 
 
 def run_query(method, collection, query):
     startTime = datetime.datetime.now()
     if method == "find_count":
         count = collection.find(query).count()
+        endTime = datetime.datetime.now()
     elif method == "agg_count":
-        count = collection.aggregate(query)
+        cursor = collection.aggregate(query)
+        endTime = datetime.datetime.now()
+        count = cursor.next()["count"]
     else:
         print("Unrecognised method: {}".format(method))
         sys.exit(1)
-    endTime = datetime.datetime.now()
     ex_time = (endTime - startTime).total_seconds()
 
     return ex_time, count
@@ -215,7 +220,7 @@ class ArgParser:
         self.password = args.password
         self.margin = int(args.margin)
         self.query_length = int(args.query_length)
-        # self.passes = int(args.passes)
+        self.passes = int(args.passes)
 
 
 if __name__ == '__main__':
