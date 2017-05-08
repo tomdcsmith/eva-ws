@@ -36,7 +36,7 @@ CHROM_INFO = {
     "21": {"minStart": 9411199, "maxStart": 48119868, "numEntries": 2082680},
     "22": {"minStart": 16050036, "maxStart": 51244515, "numEntries": 2172028},
     "X": {"minStart": 60003, "maxStart": 155260479, "numEntries": 5893713},
-    "Y": {"minStart": 10003, "maxStart": 59363485, "numEntries": 504508}
+    # "Y": {"minStart": 10003, "maxStart": 59363485, "numEntries": 504508}
 }
 
 
@@ -48,25 +48,25 @@ def main():
 
 
 def benchmark(collection, margin, query_length, passes):
-    fc_ex_times = []
-    ac_ex_times = []
-
-    fc_counts = []
-    ac_counts = []
-
-    chromosomes = [str(chromosome) for chromosome in range(1, 23)] + ["X"]
-    # chromosomes = ["X", "Y"]
+    # fc_ex_times = []
+    # ac_ex_times = []
+    #
+    # fc_counts = []
+    # ac_counts = []
+    #
+    # chromosomes = [str(chromosome) for chromosome in range(1, 23)] + ["X"]
+    # # chromosomes = ["X", "Y"]
 
     benchmark_functions = ["fc", "ac"]
     random.shuffle(benchmark_functions)
 
-    for _ in range(passes):
-        benchmark_functions.insert(1, benchmark_functions.pop(0))
-        mult_factor = math.floor(len(chromosomes) / len(benchmark_functions))
-        benchmark_functions_to_iter = benchmark_functions * mult_factor
+    while True:
+        random.shuffle(benchmark_functions)
+        chromosomes = list(CHROM_INFO.keys())
 
-        bar = progressbar.ProgressBar()
-        for chromosome, benchmark_function in bar(zip(chromosomes, benchmark_functions_to_iter)):
+        # bar = progressbar.ProgressBar()
+        for benchmark_function in benchmark_functions:
+            chromosome = random.choice(chromosomes)
             min_pos, max_pos = get_min_max_pos(chromosome, query_length)
             start = random.randint(min_pos, max_pos)
             end = start + query_length
@@ -76,9 +76,9 @@ def benchmark(collection, margin, query_length, passes):
                          "start": {"$gt": start - margin, "$lte": end},
                          "end": {"$gte": start, "$lte": end + margin}}
 
-                ex_time, count = run_query("find_count", collection, query)
-                fc_ex_times.append(ex_time)
-                fc_counts.append(count)
+                ex_time, count, startTime = run_query("find_count", collection, query)
+                # fc_ex_times.append(ex_time)
+                # fc_counts.append(count)
 
             elif benchmark_function == "ac":
                 query = [
@@ -93,17 +93,31 @@ def benchmark(collection, margin, query_length, passes):
                     }}
                 ]
 
-                ex_time, count = run_query("agg_count", collection, query)
-                ac_ex_times.append(ex_time)
-                ac_counts.append(count)
+                ex_time, count, startTime = run_query("agg_count", collection, query)
+                # ac_ex_times.append(ex_time)
+                # ac_counts.append(count)
 
             else:
                 print(benchmark_function)
                 sys.exit(1)
 
-        output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
+            with open("ex_times/ex_times_{}.tsv".format(query_length), "at") as f:
+                out_list = [benchmark_function,
+                            ex_time,
+                            count,
+                            startTime.strftime("%Y/%m/%d_%H:%M:%S:%f"),
+                            chromosome,
+                            start,
+                            end,
+                            margin,
+                            "\n"]
+                out_list = [str(item) for item in out_list]
+                out_string = '\t'.join(out_list)
+                f.write(out_string)
 
-    output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
+
+def query_to_str(chromosome, start, end, margin):
+    return "{}:{}-{}:{}".format(chromosome, start, end, margin)
 
 
 def get_min_max_pos(chromosome, query_length):
@@ -170,11 +184,12 @@ def stats_helper(fc_stat_list, ac_stat_list):
 def run_query(method, collection, query):
     while True:
         try:
-            startTime = datetime.datetime.now()
             if method == "find_count":
+                startTime = datetime.datetime.now()
                 count = collection.collection.find(query).count()
                 endTime = datetime.datetime.now()
             elif method == "agg_count":
+                startTime = datetime.datetime.now()
                 cursor = collection.collection.aggregate(query)
                 endTime = datetime.datetime.now()
                 count = cursor.next()["count"]
@@ -184,11 +199,11 @@ def run_query(method, collection, query):
 
             ex_time = (endTime - startTime).total_seconds()
 
-            return ex_time, count
+            return ex_time, count, startTime
         except StopIteration:
-            print("Stop iteration, trying again")
-            print("query: {}".format(query))
-            sys.exit(1)
+            # print("Stop iteration, trying again")
+            # print("query: {}".format(query))
+            # sys.exit(1)
             collection.get_client()
             collection.get_collection()
 
