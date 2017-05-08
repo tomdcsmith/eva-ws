@@ -1,15 +1,11 @@
 import argparse
 import random
+
 import sys
-import traceback
-import datetime
-import math
 
 import progressbar
 from bson.codec_options import CodecOptions
 from pymongo import MongoClient, ReadPreference
-import numpy as np
-from scipy import stats
 
 
 CHROM_INFO = {
@@ -36,7 +32,7 @@ CHROM_INFO = {
     "21": {"minStart": 9411199, "maxStart": 48119868, "numEntries": 2082680},
     "22": {"minStart": 16050036, "maxStart": 51244515, "numEntries": 2172028},
     "X": {"minStart": 60003, "maxStart": 155260479, "numEntries": 5893713},
-    "Y": {"minStart": 10003, "maxStart": 59363485, "numEntries": 504508}
+    # "Y": {"minStart": 10003, "maxStart": 59363485, "numEntries": 504508}
 }
 
 
@@ -44,41 +40,34 @@ def main():
     parser = ArgParser(sys.argv)
     collection = PymongoConnection(parser.uri, parser.database, parser.username, parser.password,
                                    parser.collection)
-    benchmark(collection, parser.margin, parser.query_length, parser.passes)
+    check_counts(collection, parser.margin, parser.query_length, parser.runs)
 
 
-def benchmark(collection, margin, query_length, passes):
-    fc_ex_times = []
-    ac_ex_times = []
-
-    fc_counts = []
-    ac_counts = []
-
-    chromosomes = [str(chromosome) for chromosome in range(1, 23)] + ["X"]
-    # chromosomes = ["X", "Y"]
-
+def check_counts(collection, margin, query_length, runs):
     benchmark_functions = ["fc", "ac"]
     random.shuffle(benchmark_functions)
 
-    for _ in range(passes):
+    bar = progressbar.ProgressBar()
+    for _ in bar(list(range(runs))):
         benchmark_functions.insert(1, benchmark_functions.pop(0))
-        mult_factor = math.floor(len(chromosomes) / len(benchmark_functions))
-        benchmark_functions_to_iter = benchmark_functions * mult_factor
 
-        bar = progressbar.ProgressBar()
-        for chromosome, benchmark_function in bar(zip(chromosomes, benchmark_functions_to_iter)):
-            min_pos, max_pos = get_min_max_pos(chromosome, query_length)
-            start = random.randint(min_pos, max_pos)
-            end = start + query_length
+        chromosome = random.choice(list(CHROM_INFO.keys()))
+        min_pos, max_pos = get_min_max_pos(chromosome, query_length)
+        start = random.randint(min_pos, max_pos)
+        end = start + query_length
 
+        print("{}\t{}\t{}\t{}".format(chromosome, start, end, margin))
+
+        fc_count = None
+        ac_count = None
+
+        for benchmark_function in benchmark_functions:
             if benchmark_function == "fc":
                 query = {"chr": chromosome,
                          "start": {"$gt": start - margin, "$lte": end},
                          "end": {"$gte": start, "$lte": end + margin}}
 
-                ex_time, count = run_query("find_count", collection, query)
-                fc_ex_times.append(ex_time)
-                fc_counts.append(count)
+                fc_count = run_query("find_count", collection, query)
 
             elif benchmark_function == "ac":
                 query = [
@@ -93,120 +82,42 @@ def benchmark(collection, margin, query_length, passes):
                     }}
                 ]
 
-                ex_time, count = run_query("agg_count", collection, query)
-                ac_ex_times.append(ex_time)
-                ac_counts.append(count)
+                ac_count = run_query("agg_count", collection, query)
 
             else:
                 print(benchmark_function)
                 sys.exit(1)
 
-        output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
+        assert fc_count == ac_count, "fc_count ({}) != ac_count ({}) for query: {}".format(fc_count,
+                                                                                           ac_count,
+                                                                                           query)
 
-    output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts)
+
+def run_query(method, collection, query):
+    while True:
+        try:
+            if method == "find_count":
+                count = collection.collection.find(query).count()
+            elif method == "agg_count":
+                cursor = collection.collection.aggregate(query)
+                count = cursor.next()["count"]
+            else:
+                print("Unrecognised method: {}".format(method))
+                sys.exit(1)
+
+            return count
+
+        except StopIteration:
+            # print("Stop iteration, trying again")
+            # print("query: {}".format(query))
+            collection.get_client()
+            collection.get_collection()
 
 
 def get_min_max_pos(chromosome, query_length):
     min_pos = CHROM_INFO[chromosome]["minStart"]
     max_pos = CHROM_INFO[chromosome]["maxStart"] - query_length
     return min_pos, max_pos
-
-
-def output_stats(fc_ex_times, fc_counts, ac_ex_times, ac_counts):
-
-    rec_div = 10000
-
-    fc_time_per_n_rec = np.divide(fc_ex_times, np.divide(fc_counts, rec_div))
-    ac_time_per_n_rec = np.divide(ac_ex_times, np.divide(ac_counts, rec_div))
-
-    print("\n\n#####################################################\n")
-    print("STATS\n")
-
-    print("EX TIMES STATS")
-    stats_helper(fc_ex_times, ac_ex_times)
-
-    print("\nTIME PER {} RECORDS".format(rec_div))
-    stats_helper(fc_time_per_n_rec, ac_time_per_n_rec)
-
-    print("\n#####################################################\n\n")
-
-
-def stats_helper(fc_stat_list, ac_stat_list):
-    fc_mean = np.mean(fc_stat_list)
-    ac_mean = np.mean(ac_stat_list)
-
-    fc_quartiles = [
-        min(fc_stat_list),
-        np.percentile(fc_stat_list, 25),
-        np.percentile(fc_stat_list, 50),
-        np.percentile(fc_stat_list, 75),
-        max(fc_stat_list)
-    ]
-
-    ac_quartiles = [
-        min(ac_stat_list),
-        np.percentile(ac_stat_list, 25),
-        np.percentile(ac_stat_list, 50),
-        np.percentile(ac_stat_list, 75),
-        max(ac_stat_list)
-    ]
-
-    fc_std = np.std(fc_stat_list)
-    ac_std = np.std(ac_stat_list)
-
-    print("find().count():\n{}".format(fc_stat_list))
-    print("aggregate count:\n{}".format(ac_stat_list))
-
-    print("\nStats [find_count, aggregate_count]\n")
-    print("Means: {}, {}".format(fc_mean, ac_mean))
-    print("Quartiles:\n{}\n{}\n".format(fc_quartiles, ac_quartiles))
-    print("Standard deviation: {}, {}".format(fc_std, ac_std))
-
-    if len(fc_stat_list) > 20 and len(ac_stat_list) > 20:
-        print("Mann-Whitney rank test (test statistic, pvalue): {}".format(
-            stats.mannwhitneyu(fc_stat_list, ac_stat_list)))
-
-
-def run_query(method, collection, query):
-    while True:
-        try:
-            startTime = datetime.datetime.now()
-            if method == "find_count":
-                count = collection.collection.find(query).count()
-                endTime = datetime.datetime.now()
-            elif method == "agg_count":
-                cursor = collection.collection.aggregate(query)
-                endTime = datetime.datetime.now()
-                count = cursor.next()["count"]
-            else:
-                print("Unrecognised method: {}".format(method))
-                sys.exit(1)
-
-            ex_time = (endTime - startTime).total_seconds()
-
-            return ex_time, count
-        except StopIteration:
-            print("Stop iteration, trying again")
-            print("query: {}".format(query))
-            sys.exit(1)
-            collection.get_client()
-            collection.get_collection()
-
-
-def get_collection(uri=None, db=None, user=None, password=None, collection=None):
-    try:
-        client = MongoClient(uri, port=27017, read_preference=ReadPreference.SECONDARY_PREFERRED)
-        client.admin.authenticate(user, password)
-        db = client[db]
-        options = CodecOptions(unicode_decode_error_handler="ignore")
-        coll = db.get_collection(collection, codec_options=options)
-        return coll
-    except:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        e = sys.exc_info()[0]
-        print("Error: %s\tline: %s\texc_obj: %s" % (e, exc_tb.tb_lineno, exc_obj))
-        traceback.print_tb(exc_tb)
-        sys.exit(1)
 
 
 class PymongoConnection:
@@ -243,7 +154,7 @@ class ArgParser:
         parser.add_argument('-p', dest='password', action='store', help='password')
         parser.add_argument('-m', dest='margin', action='store', help='margin')
         parser.add_argument('-q', dest='query_length', action='store', help='query_length')
-        parser.add_argument('-P', dest='passes', action='store', help='passes')
+        parser.add_argument('-r', dest='runs', action='store', help='runs')
 
         args = parser.parse_args(args=argv[1:])
 
@@ -254,7 +165,7 @@ class ArgParser:
         self.password = args.password
         self.margin = int(args.margin)
         self.query_length = int(args.query_length)
-        self.passes = int(args.passes)
+        self.runs = int(args.runs)
 
 
 if __name__ == '__main__':
