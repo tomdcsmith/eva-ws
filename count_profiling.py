@@ -58,11 +58,10 @@ def benchmark(collection, margin, query_length, passes):
     # # chromosomes = ["X", "Y"]
 
     benchmark_functions = ["fc", "ac"]
-    random.shuffle(benchmark_functions)
+    chromosomes = list(CHROM_INFO.keys())
 
     while True:
         random.shuffle(benchmark_functions)
-        chromosomes = list(CHROM_INFO.keys())
 
         # bar = progressbar.ProgressBar()
         for benchmark_function in benchmark_functions:
